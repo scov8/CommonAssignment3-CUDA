@@ -49,6 +49,14 @@
         }                                                                 \
     }
 
+/**
+ * @brief            Apply counting sort algorithm on the CPU.
+ *
+ * @param A          a pointer to an array which must be sorted.
+ * @param B          a pointer to a result array.
+ * @param maxValue   max value of array.
+ * @param length     size of array.
+ */
 void countingSortOnHost(DATATYPE *A, DATATYPE *B, int maxValue, int length)
 {
     DATATYPE *C = (DATATYPE *)calloc(maxValue + 1, sizeof(DATATYPE));
@@ -68,6 +76,13 @@ void countingSortOnHost(DATATYPE *A, DATATYPE *B, int maxValue, int length)
     free(C);
 }
 
+/**
+ * @brief            Apply the histogram phase of the counting sort on the Kernel.
+ *
+ * @param A          a pointer to an array which must be sorted.
+ * @param C          a pointer to a count array.
+ * @param N          size of array.
+ */
 __global__ void countingSortKernel1(DATATYPE *A, DATATYPE *C, int N, int K)
 {
     __shared__ DATATYPE sharedCount[MAX_VALUE];
@@ -95,6 +110,12 @@ __global__ void countingSortKernel1(DATATYPE *A, DATATYPE *C, int N, int K)
     return;
 }
 
+/**
+ * @brief     Transform the frequencies in the count array into indices on the Kernel.
+ *
+ * @param C   a pointer to a count array.
+ * @param K   max value of array.
+ */
 __global__ void countingSortKernel2(DATATYPE *C, int K)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -105,6 +126,14 @@ __global__ void countingSortKernel2(DATATYPE *C, int K)
     }
 }
 
+/**
+ * @brief            Distribute the numbers from the input array into the output array in sorted order on the Kernel.
+ *
+ * @param A          a pointer to an array which must be sorted.
+ * @param B          a pointer to a result array.
+ * @param C          a pointer to a count array.
+ * @param N          size of array.
+ */
 __global__ void countingSortKernel3(DATATYPE *A, DATATYPE *B, DATATYPE *C, int N)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -113,6 +142,15 @@ __global__ void countingSortKernel3(DATATYPE *A, DATATYPE *B, DATATYPE *C, int N
         B[atomicSub(&C[__ldg(&A[i])], 1) - 1] = __ldg(&A[i]);
 }
 
+/**
+ * @brief                   Transform the frequencies in the count array into indices on the Kernel.
+ *
+ * @param initArray         a pointer to an array which must be sorted.
+ * @param outputArray       a pointer to a result array.
+ * @param maxValue          max value of array.
+ * @param length            size of array.
+ * @param THREADxBLOCK      number of threads in a block.
+ */
 void countingSortOnDevice(DATATYPE *initArray, DATATYPE *outputArray, int maxValue, int length, int THREADxBLOCK)
 {
     int sizeArray = length * sizeof(DATATYPE);

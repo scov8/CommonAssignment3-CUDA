@@ -49,10 +49,18 @@
         }                                                                 \
     }
 
-void make_csv(float gflops, float time, float N, float gridsize, int THREADxBLOCK)
+/**
+ * @brief                 Reports the data for analysis in a csv file
+ *
+ * @param time            execution time.
+ * @param N               size of array.
+ * @param gridsize        number of blocks in a grid.
+ * @param THREADxBLOCK    number of threads in a block.
+ */
+void make_csv(float time, int N, int gridsize, int THREADxBLOCK)
 {
     FILE *fp;
-    char root_filename[] = "global_measures";
+    char root_filename[] = "shared_measures";
 
     char *filename = (char *)malloc(sizeof(char) * (strlen(root_filename) + 10 * sizeof(char)));
     sprintf(filename, "%s_%d.csv", root_filename, THREADxBLOCK);
@@ -64,31 +72,19 @@ void make_csv(float gflops, float time, float N, float gridsize, int THREADxBLOC
     else
     {
         fp = fopen(filename, "w");
-        fprintf(fp, "N, BlockSize, GridSize, gflops, time_sec\n");
+        fprintf(fp, "N, BlockSize, GridSize, time_sec\n");
     }
-    fprintf(fp, "%f, %d, %f, %f, %f\n", N, THREADxBLOCK, gridsize, gflops, time);
+    fprintf(fp, "%d, %d, %d, %f\n", N, THREADxBLOCK, gridsize, time);
     fclose(fp);
 }
 
-void countingSortOnHost(DATATYPE *A, DATATYPE *B, int maxValue, int length)
-{
-    DATATYPE *C = (DATATYPE *)calloc(maxValue + 1, sizeof(DATATYPE));
-
-    for (int i = 0; i <= length - 1; i++)
-        C[A[i]] += 1;
-
-    for (int i = 1; i <= maxValue; i++)
-        C[i] += C[i - 1];
-
-    for (int i = length - 1; i >= 0; i--)
-    {
-        B[C[A[i]] - 1] = A[i];
-        C[A[i]]--;
-    }
-
-    free(C);
-}
-
+/**
+ * @brief            Apply the histogram phase of the counting sort on the Kernel.
+ *
+ * @param A          a pointer to an array which must be sorted.
+ * @param C          a pointer to a count array.
+ * @param N          size of array.
+ */
 __global__ void countingSortKernel1(DATATYPE *A, DATATYPE *C, int N, int K)
 {
     __shared__ DATATYPE sharedCount[MAX_VALUE];
@@ -116,6 +112,12 @@ __global__ void countingSortKernel1(DATATYPE *A, DATATYPE *C, int N, int K)
     return;
 }
 
+/**
+ * @brief     Transform the frequencies in the count array into indices on the Kernel.
+ *
+ * @param C   a pointer to a count array.
+ * @param K   max value of array.
+ */
 __global__ void countingSortKernel2(DATATYPE *C, int K)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -126,6 +128,14 @@ __global__ void countingSortKernel2(DATATYPE *C, int K)
     }
 }
 
+/**
+ * @brief            Distribute the numbers from the input array into the output array in sorted order on the Kernel.
+ *
+ * @param A          a pointer to an array which must be sorted.
+ * @param B          a pointer to a result array.
+ * @param C          a pointer to a count array.
+ * @param N          size of array.
+ */
 __global__ void countingSortKernel3(DATATYPE *A, DATATYPE *B, DATATYPE *C, int N)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -134,6 +144,15 @@ __global__ void countingSortKernel3(DATATYPE *A, DATATYPE *B, DATATYPE *C, int N
         B[atomicSub(&C[A[i]], 1) - 1] = A[i];
 }
 
+/**
+ * @brief                   Transform the frequencies in the count array into indices on the Kernel.
+ *
+ * @param initArray         a pointer to an array which must be sorted.
+ * @param outputArray       a pointer to a result array.
+ * @param maxValue          max value of array.
+ * @param length            size of array.
+ * @param THREADxBLOCK      number of threads in a block.
+ */
 void countingSortOnDevice(DATATYPE *initArray, DATATYPE *outputArray, int maxValue, int length, int THREADxBLOCK)
 {
     int sizeArray = length * sizeof(DATATYPE);
@@ -188,6 +207,8 @@ void countingSortOnDevice(DATATYPE *initArray, DATATYPE *outputArray, int maxVal
     /*mflops = 2. * length * length;
     mflops = mflops / (1000.f * 1000.f * elapsed);
     printf("Mflops: %f\n", mflops);*/
+
+    make_csv(elapsed, length, gridSize.x, THREADxBLOCK);
 
     CUDA_CHECK(cudaMemcpy(outputArray, device_outputArray, sizeArray, cudaMemcpyDeviceToHost));
 
