@@ -202,10 +202,7 @@ void countingSortOnDevice(DATATYPE *initArray, DATATYPE *outputArray, int maxVal
     CUDA_CHECK(cudaEventDestroy(stop));
 
     printf("Kernel elapsed time %fs \n", elapsed);
-    /*mflops = 2. * length * length;
-    mflops = mflops / (1000.f * 1000.f * elapsed);
-    printf("Mflops: %f\n", mflops);*/
-
+    
     CUDA_CHECK(cudaMemcpy(outputArray, device_outputArray, sizeArray, cudaMemcpyDeviceToHost));
 
     CUDA_CHECK(cudaFree(device_initArray));
